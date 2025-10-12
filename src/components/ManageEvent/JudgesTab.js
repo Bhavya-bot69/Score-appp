@@ -174,8 +174,8 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
   };
 
   const handleAutoAssignTeams = async () => {
-    const softwareTeams = teams.filter(t => t.categoryId && t.categoryId.toLowerCase() === 'software');
-    const hardwareTeams = teams.filter(t => t.categoryId && t.categoryId.toLowerCase() === 'hardware');
+    const softwareTeams = teams.filter(t => (t.category_id || t.categoryId) && (t.category_id || t.categoryId).toLowerCase() === 'software');
+    const hardwareTeams = teams.filter(t => (t.category_id || t.categoryId) && (t.category_id || t.categoryId).toLowerCase() === 'hardware');
 
     const softwareJudges = judges.filter(j => j.category && j.category.toLowerCase() === 'software');
     const hardwareJudges = judges.filter(j => j.category && j.category.toLowerCase() === 'hardware');
@@ -200,7 +200,7 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
         if (judgeInArray) {
           const numTeams = teamsPerJudge + (judgeIndex < extraTeams ? 1 : 0);
           const assignedTeamIds = softwareTeams.slice(teamIndex, teamIndex + numTeams).map(t => t.id);
-          const softwareCategoryIds = [...new Set(softwareTeams.map(t => t.categoryId))].filter(Boolean);
+          const softwareCategoryIds = [...new Set(softwareTeams.map(t => t.category_id || t.categoryId))].filter(Boolean);
 
           judgeInArray.assignedTeams = assignedTeamIds;
           judgeInArray.assignedCategories = softwareCategoryIds;
@@ -219,7 +219,7 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
         if (judgeInArray) {
           const numTeams = teamsPerJudge + (judgeIndex < extraTeams ? 1 : 0);
           const assignedTeamIds = hardwareTeams.slice(teamIndex, teamIndex + numTeams).map(t => t.id);
-          const hardwareCategoryIds = [...new Set(hardwareTeams.map(t => t.categoryId))].filter(Boolean);
+          const hardwareCategoryIds = [...new Set(hardwareTeams.map(t => t.category_id || t.categoryId))].filter(Boolean);
 
           judgeInArray.assignedTeams = assignedTeamIds;
           judgeInArray.assignedCategories = hardwareCategoryIds;
@@ -244,8 +244,8 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
   };
 
 
-  const softwareTeamsCount = teams.filter(t => t.categoryId && t.categoryId.toLowerCase() === 'software').length;
-  const hardwareTeamsCount = teams.filter(t => t.categoryId && t.categoryId.toLowerCase() === 'hardware').length;
+  const softwareTeamsCount = teams.filter(t => (t.category_id || t.categoryId) && (t.category_id || t.categoryId).toLowerCase() === 'software').length;
+  const hardwareTeamsCount = teams.filter(t => (t.category_id || t.categoryId) && (t.category_id || t.categoryId).toLowerCase() === 'hardware').length;
   const softwareJudgesCount = judges.filter(j => j.category && j.category.toLowerCase() === 'software').length;
   const hardwareJudgesCount = judges.filter(j => j.category && j.category.toLowerCase() === 'hardware').length;
 
@@ -529,15 +529,16 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
             >
               {teams
                 .filter(team => {
-                  if (!selectedJudge?.category || !team.categoryId) return false;
-                  return team.categoryId.toLowerCase() === selectedJudge.category.toLowerCase();
+                  const teamCategory = team.category_id || team.categoryId;
+                  if (!selectedJudge?.category || !teamCategory) return false;
+                  return teamCategory.toLowerCase() === selectedJudge.category.toLowerCase();
                 })
                 .map((team) => (
                   <MenuItem key={team.id} value={team.id}>
                     <Checkbox checked={(selectedJudge?.assignedTeams || []).includes(team.id)} />
                     <ListItemText
                       primary={team.name}
-                      secondary={`Project: ${team.projectTitle || 'N/A'}`}
+                      secondary={`Project: ${team.project_title || team.projectTitle || 'N/A'}`}
                     />
                   </MenuItem>
                 ))}
@@ -545,8 +546,9 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
           </FormControl>
 
           {teams.filter(team => {
-            if (!selectedJudge?.category || !team.categoryId) return false;
-            return team.categoryId.toLowerCase() === selectedJudge.category.toLowerCase();
+            const teamCategory = team.category_id || team.categoryId;
+            if (!selectedJudge?.category || !teamCategory) return false;
+            return teamCategory.toLowerCase() === selectedJudge.category.toLowerCase();
           }).length === 0 && (
             <Box sx={{ mt: 2, p: 2, backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
               <Typography variant="body2" sx={{ color: '#dc2626' }}>
