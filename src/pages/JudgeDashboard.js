@@ -46,15 +46,21 @@ function JudgeDashboard() {
     const allJudges = [];
     const eventKeys = Object.keys(localStorage).filter(key => key.startsWith('judges_'));
 
+    console.log('Found event keys:', eventKeys);
+
     eventKeys.forEach(key => {
       const eventJudges = JSON.parse(localStorage.getItem(key) || '[]');
+      console.log(`Judges from ${key}:`, eventJudges);
       allJudges.push(...eventJudges.map(j => ({ ...j, eventId: key.replace('judges_', '') })));
     });
+
+    console.log('All judges:', allJudges);
+    console.log('Looking for token:', token);
 
     const foundJudge = allJudges.find(j => j.token === token);
 
     if (!foundJudge) {
-      setError('Invalid access token. Please check your invitation link.');
+      setError(`Invalid access token. Please check your invitation link. Token received: ${token}`);
       setLoading(false);
       return;
     }
@@ -62,10 +68,17 @@ function JudgeDashboard() {
     setJudge(foundJudge);
 
     const eventTeams = JSON.parse(localStorage.getItem(`teams_${foundJudge.eventId}`) || '[]');
+    console.log('Event teams:', eventTeams);
+    console.log('Judge assigned teams:', foundJudge.assignedTeams);
+
     const assigned = eventTeams.filter(team =>
       (foundJudge.assignedTeams || []).includes(team.id)
     );
+    console.log('Filtered assigned teams:', assigned);
     setAssignedTeams(assigned);
+
+    const eventCriteria = JSON.parse(localStorage.getItem(`criteria_${foundJudge.eventId}`) || '[]');
+    console.log('Event criteria:', eventCriteria);
 
     const savedScores = JSON.parse(localStorage.getItem(`scores_${foundJudge.id}`) || '{}');
     setScores(savedScores);
@@ -139,7 +152,38 @@ function JudgeDashboard() {
   if (error) {
     return (
       <Box sx={{ minHeight: '100vh', background: '#f5f7fa', p: 4 }}>
-        <Alert severity="error">{error}</Alert>
+        <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
+          <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
+
+          <Card sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Debug Information</Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Token from URL:</Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={token || 'No token provided'}
+                InputProps={{ readOnly: true }}
+                sx={{ mb: 2 }}
+              />
+            </Box>
+            <Button
+              variant="contained"
+              onClick={() => {
+                console.log('Manual debug triggered');
+                console.log('Token:', token);
+                const allKeys = Object.keys(localStorage).filter(k => k.startsWith('judges_'));
+                console.log('Judge keys in localStorage:', allKeys);
+                allKeys.forEach(key => {
+                  const data = JSON.parse(localStorage.getItem(key) || '[]');
+                  console.log(`${key}:`, data);
+                });
+              }}
+            >
+              Log Debug Info to Console
+            </Button>
+          </Card>
+        </Box>
       </Box>
     );
   }

@@ -35,6 +35,7 @@ import {
 function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange, eventId, eventName }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [openAssignDialog, setOpenAssignDialog] = useState(false);
+  const [openLinkDialog, setOpenLinkDialog] = useState(false);
   const [currentJudge, setCurrentJudge] = useState({
     name: "",
     email: "",
@@ -43,6 +44,7 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
     category: "",
   });
   const [selectedJudge, setSelectedJudge] = useState(null);
+  const [linkJudge, setLinkJudge] = useState(null);
 
   const handleAddJudge = () => {
     setCurrentJudge({ name: "", email: "", assignedCategories: [], assignedTeams: [], category: "" });
@@ -130,6 +132,11 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
 
     onJudgesChange(updatedJudges);
     setOpenDialog(false);
+
+    if (!currentJudge.id) {
+      setLinkJudge(newJudge);
+      setOpenLinkDialog(true);
+    }
   };
 
   const handleDeleteJudge = (judgeId) => {
@@ -334,15 +341,17 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => handleSendInvitation(judge)}
-                        disabled={judge.invitationSent}
+                        onClick={() => {
+                          setLinkJudge(judge);
+                          setOpenLinkDialog(true);
+                        }}
                         sx={{
-                          color: judge.invitationSent ? "#9ca3af" : "#8b5cf6",
+                          color: "#8b5cf6",
                           "&:hover": {
                             backgroundColor: "#faf5ff"
                           }
                         }}
-                        title="Send Invitation"
+                        title="View Dashboard Link"
                       >
                         <SendIcon fontSize="small" />
                       </IconButton>
@@ -510,6 +519,72 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
         <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
           <Button onClick={() => setOpenAssignDialog(false)}>Cancel</Button>
           <Button onClick={handleSaveAssignments} variant="contained">Save Assignments</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openLinkDialog} onClose={() => setOpenLinkDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Judge Dashboard Link</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2, mt: 2 }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+              Judge: {linkJudge?.name}
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+              Share this link with the judge to access their dashboard
+            </Typography>
+
+            <TextField
+              fullWidth
+              label="Dashboard Link"
+              value={linkJudge ? `${window.location.origin}/judge-dashboard?token=${linkJudge.token}` : ''}
+              InputProps={{ readOnly: true }}
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              fullWidth
+              label="Access Token"
+              value={linkJudge?.token || ''}
+              InputProps={{ readOnly: true }}
+              sx={{ mb: 2 }}
+              helperText="The judge can also manually enter this token if needed"
+            />
+
+            <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+              <Button
+                variant="contained"
+                onClick={async () => {
+                  const url = `${window.location.origin}/judge-dashboard?token=${linkJudge.token}`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    alert('Link copied to clipboard!');
+                  } catch (err) {
+                    alert('Failed to copy. Please copy manually.');
+                  }
+                }}
+              >
+                Copy Link
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  const url = `${window.location.origin}/judge-dashboard?token=${linkJudge.token}`;
+                  window.open(url, '_blank');
+                }}
+              >
+                Test Link
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => handleSendInvitation(linkJudge)}
+              >
+                Send Email
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 2 }}>
+          <Button onClick={() => setOpenLinkDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
