@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { eventService } from "../../services/eventService";
 import {
   Box,
   Button,
@@ -28,7 +29,7 @@ import {
   Upload as UploadIcon,
 } from "@mui/icons-material";
 
-function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {} }) {
+function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTeam, setCurrentTeam] = useState({
     name: "",
@@ -81,32 +82,51 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {} }) {
     setOpenDialog(true);
   };
 
-  const handleSaveTeam = () => {
+  const handleSaveTeam = async () => {
     if (!currentTeam.name || !currentTeam.leaderName || !currentTeam.leaderEmail || !currentTeam.categoryId) {
       alert("Team name, leader name, leader email, and category are required");
       return;
     }
 
-    const newTeam = {
-      id: currentTeam.id || Date.now(),
-      ...currentTeam,
-      createdAt: currentTeam.createdAt || new Date().toISOString(),
-    };
+    try {
+      const teamData = {
+        event_id: eventId,
+        name: currentTeam.name,
+        category_id: currentTeam.categoryId,
+        project_title: currentTeam.projectTitle || '',
+        project_description: currentTeam.projectDescription || '',
+        members: [{
+          name: currentTeam.leaderName,
+          email: currentTeam.leaderEmail,
+          role: 'leader'
+        }]
+      };
 
-    let updatedTeams;
-    if (currentTeam.id) {
-      updatedTeams = teams.map((t) => (t.id === currentTeam.id ? newTeam : t));
-    } else {
-      updatedTeams = [...teams, newTeam];
+      if (currentTeam.id) {
+        await eventService.updateTeam(currentTeam.id, teamData);
+      } else {
+        await eventService.createTeam(teamData);
+      }
+
+      const updatedTeams = await eventService.getTeamsByEvent(eventId);
+      onTeamsChange(updatedTeams);
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error saving team:', error);
+      alert('Failed to save team. Please try again.');
     }
-    onTeamsChange(updatedTeams);
-    setOpenDialog(false);
   };
 
-  const handleDeleteTeam = (teamId) => {
+  const handleDeleteTeam = async (teamId) => {
     if (window.confirm("Are you sure you want to delete this team?")) {
-      const updatedTeams = teams.filter((t) => t.id !== teamId);
-      onTeamsChange(updatedTeams);
+      try {
+        await eventService.deleteTeam(teamId);
+        const updatedTeams = teams.filter((t) => t.id !== teamId);
+        onTeamsChange(updatedTeams);
+      } catch (error) {
+        console.error('Error deleting team:', error);
+        alert('Failed to delete team. Please try again.');
+      }
     }
   };
 
@@ -377,31 +397,46 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {} }) {
                 </TableCell>
               </TableRow>
             ) : (
-              teams.map((team) => (
-                <TableRow key={team.id} sx={{ "&:hover": { backgroundColor: "#f8fafc" } }}>
-                  <TableCell sx={{ color: "#334155", fontWeight: 500 }}>{team.name}</TableCell>
-                  <TableCell sx={{ color: "#334155" }}>{team.projectTitle || "-"}</TableCell>
-                  <TableCell sx={{ color: "#334155" }}>{team.leaderName}</TableCell>
-                  <TableCell sx={{ color: "#334155" }}>{team.leaderEmail}</TableCell>
-                  <TableCell sx={{ color: "#334155" }}>{team.categoryId || "Not assigned"}</TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => { setCurrentTeam(team); setOpenDialog(true); }}
-                      sx={{ color: "#3b82f6", "&:hover": { backgroundColor: "#eff6ff" } }}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDeleteTeam(team.id)}
-                      sx={{ color: "#ef4444", "&:hover": { backgroundColor: "#fef2f2" } }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+              teams.map((team) => {
+                const leader = team.members && team.members.length > 0 ? team.members[0] : {};
+                return (
+                  <TableRow key={team.id} sx={{ "&:hover": { backgroundColor: "#f8fafc" } }}>
+                    <TableCell sx={{ color: "#334155", fontWeight: 500 }}>{team.name}</TableCell>
+                    <TableCell sx={{ color: "#334155" }}>{team.project_title || "-"}</TableCell>
+                    <TableCell sx={{ color: "#334155" }}>{leader.name || team.leaderName || "-"}</TableCell>
+                    <TableCell sx={{ color: "#334155" }}>{leader.email || team.leaderEmail || "-"}</TableCell>
+                    <TableCell sx={{ color: "#334155" }}>{team.category_id || team.categoryId || "Not assigned"}</TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          const editTeam = {
+                            id: team.id,
+                            name: team.name,
+                            projectTitle: team.project_title || team.projectTitle || '',
+                            projectDescription: team.project_description || team.projectDescription || '',
+                            leaderName: leader.name || team.leaderName || '',
+                            leaderEmail: leader.email || team.leaderEmail || '',
+                            categoryId: team.category_id || team.categoryId || ''
+                          };
+                          setCurrentTeam(editTeam);
+                          setOpenDialog(true);
+                        }}
+                        sx={{ color: "#3b82f6", "&:hover": { backgroundColor: "#eff6ff" } }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteTeam(team.id)}
+                        sx={{ color: "#ef4444", "&:hover": { backgroundColor: "#fef2f2" } }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

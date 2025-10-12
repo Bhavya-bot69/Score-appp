@@ -21,6 +21,7 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 
 import Navigation from "../components/Navigation";
+import { eventService } from "../services/eventService";
 import TeamsTab from "../components/ManageEvent/TeamsTab";
 import JudgesTab from "../components/ManageEvent/JudgesTab";
 import RoundsTab from "../components/ManageEvent/RoundsTab";
@@ -40,19 +41,37 @@ function ManageEvent() {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    const events = JSON.parse(localStorage.getItem("events") || "[]");
-    const foundEvent = events.find((e) => e.id === parseInt(eventId));
-    setEvent(foundEvent);
-
-    setTeams(JSON.parse(localStorage.getItem(`teams_${eventId}`) || "[]"));
-    setJudges(JSON.parse(localStorage.getItem(`judges_${eventId}`) || "[]"));
-    setRounds(JSON.parse(localStorage.getItem(`rounds_${eventId}`) || "[]"));
-    setVenues(JSON.parse(localStorage.getItem(`venues_${eventId}`) || "[]"));
-    setCriteria(JSON.parse(localStorage.getItem(`criteria_${eventId}`) || "[]"));
+    loadEventData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  const saveData = (key, data) => {
-    localStorage.setItem(`${key}_${eventId}`, JSON.stringify(data));
+  const loadEventData = async () => {
+    try {
+      const foundEvent = await eventService.getEvent(eventId);
+      setEvent(foundEvent);
+
+      const [teamsData, judgesData, criteriaData] = await Promise.all([
+        eventService.getTeamsByEvent(eventId),
+        eventService.getJudgesByEvent(eventId),
+        eventService.getCriteriaByEvent(eventId),
+      ]);
+
+      const judgesWithAssignments = await Promise.all(
+        judgesData.map(async (j) => {
+          const assignedTeams = await eventService.getJudgeAssignments(j.id);
+          return { ...j, assignedTeams };
+        })
+      );
+
+      setTeams(teamsData);
+      setJudges(judgesWithAssignments);
+      setCriteria(criteriaData);
+
+      setRounds(JSON.parse(localStorage.getItem(`rounds_${eventId}`) || "[]"));
+      setVenues(JSON.parse(localStorage.getItem(`venues_${eventId}`) || "[]"));
+    } catch (error) {
+      console.error('Error loading event data:', error);
+    }
   };
 
   const handleTabChange = (event, newValue) => {
@@ -67,27 +86,24 @@ function ManageEvent() {
 
   const handleTeamsChange = (updatedTeams) => {
     setTeams(updatedTeams);
-    saveData("teams", updatedTeams);
   };
 
   const handleJudgesChange = (updatedJudges) => {
     setJudges(updatedJudges);
-    saveData("judges", updatedJudges);
   };
 
   const handleRoundsChange = (updatedRounds) => {
     setRounds(updatedRounds);
-    saveData("rounds", updatedRounds);
+    localStorage.setItem(`rounds_${eventId}`, JSON.stringify(updatedRounds));
   };
 
   const handleVenuesChange = (updatedVenues) => {
     setVenues(updatedVenues);
-    saveData("venues", updatedVenues);
+    localStorage.setItem(`venues_${eventId}`, JSON.stringify(updatedVenues));
   };
 
   const handleCriteriaChange = (updatedCriteria) => {
     setCriteria(updatedCriteria);
-    saveData("criteria", updatedCriteria);
   };
 
   if (!event) {
@@ -475,7 +491,7 @@ function ManageEvent() {
 
           {[1, 2, 3, 4, 5].includes(currentTab) && (
             <TabContent isActive={[1, 2, 3, 4, 5].includes(currentTab)}>
-              {currentTab === 1 && <TeamsTab teams={teams} venues={venues} categories={criteria} onTeamsChange={handleTeamsChange} />}
+              {currentTab === 1 && <TeamsTab teams={teams} venues={venues} categories={criteria} onTeamsChange={handleTeamsChange} eventId={eventId} />}
               {currentTab === 2 && (
                 <JudgesTab
                   judges={judges}

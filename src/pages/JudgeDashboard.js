@@ -18,6 +18,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { AssignmentInd, CheckCircle, HourglassEmpty } from '@mui/icons-material';
+import { eventService } from '../services/eventService';
 
 function JudgeDashboard() {
   const [searchParams] = useSearchParams();
@@ -42,51 +43,61 @@ function JudgeDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const loadJudgeData = () => {
-    const allJudges = [];
-    const eventKeys = Object.keys(localStorage).filter(key => key.startsWith('judges_'));
+  const loadJudgeData = async () => {
+    try {
+      console.log('Looking for token:', token);
 
-    console.log('Found event keys:', eventKeys);
+      const foundJudge = await eventService.getJudgeByToken(token);
 
-    eventKeys.forEach(key => {
-      const eventJudges = JSON.parse(localStorage.getItem(key) || '[]');
-      console.log(`Judges from ${key}:`, eventJudges);
-      allJudges.push(...eventJudges.map(j => ({ ...j, eventId: key.replace('judges_', '') })));
-    });
+      if (!foundJudge) {
+        setError(`Invalid access token. Please check your invitation link. Token received: ${token}`);
+        setLoading(false);
+        return;
+      }
 
-    console.log('All judges:', allJudges);
-    console.log('Looking for token:', token);
+      console.log('Found judge:', foundJudge);
+      setJudge(foundJudge);
 
-    const foundJudge = allJudges.find(j => j.token === token);
+      const assignedTeamIds = await eventService.getJudgeAssignments(foundJudge.id);
+      console.log('Assigned team IDs:', assignedTeamIds);
 
-    if (!foundJudge) {
-      setError(`Invalid access token. Please check your invitation link. Token received: ${token}`);
+      const eventTeams = await eventService.getTeamsByEvent(foundJudge.event_id);
+      console.log('Event teams:', eventTeams);
+
+      const assigned = eventTeams.filter(team => assignedTeamIds.includes(team.id));
+      console.log('Filtered assigned teams:', assigned);
+      setAssignedTeams(assigned);
+
+      const existingScores = await eventService.getScoresByJudge(foundJudge.id);
+      console.log('Existing scores:', existingScores);
+
+      const scoresMap = {};
+      const submitted = new Set();
+
+      existingScores.forEach(score => {
+        if (!scoresMap[score.team_id]) {
+          scoresMap[score.team_id] = {};
+        }
+        scoresMap[score.team_id][score.criterion_key] = score.score;
+      });
+
+      assigned.forEach(team => {
+        const teamScores = scoresMap[team.id] || {};
+        const criteria = ['innovation', 'execution', 'presentation', 'impact'];
+        const allFilled = criteria.every(c => teamScores[c] !== undefined && teamScores[c] !== '');
+        if (allFilled) {
+          submitted.add(team.id);
+        }
+      });
+
+      setScores(scoresMap);
+      setSubmittedTeams(submitted);
       setLoading(false);
-      return;
+    } catch (error) {
+      console.error('Error loading judge data:', error);
+      setError(`Failed to load judge data: ${error.message}`);
+      setLoading(false);
     }
-
-    setJudge(foundJudge);
-
-    const eventTeams = JSON.parse(localStorage.getItem(`teams_${foundJudge.eventId}`) || '[]');
-    console.log('Event teams:', eventTeams);
-    console.log('Judge assigned teams:', foundJudge.assignedTeams);
-
-    const assigned = eventTeams.filter(team =>
-      (foundJudge.assignedTeams || []).includes(team.id)
-    );
-    console.log('Filtered assigned teams:', assigned);
-    setAssignedTeams(assigned);
-
-    const eventCriteria = JSON.parse(localStorage.getItem(`criteria_${foundJudge.eventId}`) || '[]');
-    console.log('Event criteria:', eventCriteria);
-
-    const savedScores = JSON.parse(localStorage.getItem(`scores_${foundJudge.id}`) || '{}');
-    setScores(savedScores);
-
-    const saved = JSON.parse(localStorage.getItem(`submitted_${foundJudge.id}`) || '[]');
-    setSubmittedTeams(new Set(saved));
-
-    setLoading(false);
   };
 
   const handleScoreChange = (teamId, criterion, value) => {
@@ -102,7 +113,7 @@ function JudgeDashboard() {
     }));
   };
 
-  const handleSubmitScores = (teamId) => {
+  const handleSubmitScores = async (teamId) => {
     const teamScores = scores[teamId] || {};
     const criteria = ['innovation', 'execution', 'presentation', 'impact'];
     const allFilled = criteria.every(c => teamScores[c] !== undefined && teamScores[c] !== '');
@@ -112,15 +123,26 @@ function JudgeDashboard() {
       return;
     }
 
-    localStorage.setItem(`scores_${judge.id}`, JSON.stringify(scores));
+    try {
+      for (const criterionKey of criteria) {
+        await eventService.upsertScore({
+          judge_id: judge.id,
+          team_id: teamId,
+          criterion_key: criterionKey,
+          score: teamScores[criterionKey],
+          round: currentRound
+        });
+      }
 
-    const newSubmitted = new Set(submittedTeams);
-    newSubmitted.add(teamId);
-    setSubmittedTeams(newSubmitted);
+      const newSubmitted = new Set(submittedTeams);
+      newSubmitted.add(teamId);
+      setSubmittedTeams(newSubmitted);
 
-    localStorage.setItem(`submitted_${judge.id}`, JSON.stringify([...newSubmitted]));
-
-    alert('Scores submitted successfully!');
+      alert('Scores submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting scores:', error);
+      alert('Failed to submit scores. Please try again.');
+    }
   };
 
   const handlePushToAdmin = () => {
@@ -129,16 +151,7 @@ function JudgeDashboard() {
       return;
     }
 
-    localStorage.setItem(`admin_scores_${judge.id}`, JSON.stringify({
-      judgeId: judge.id,
-      judgeName: judge.name,
-      eventId: judge.eventId,
-      scores: scores,
-      submittedAt: new Date().toISOString(),
-      round: currentRound
-    }));
-
-    alert('All scores have been pushed to admin dashboard!');
+    alert('All scores are automatically synced to the admin dashboard!');
   };
 
   if (loading) {

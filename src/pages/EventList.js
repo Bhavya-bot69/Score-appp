@@ -14,6 +14,7 @@ import {
   Chip,
 } from "@mui/material";
 import Navigation from "../components/Navigation";
+import { eventService } from "../services/eventService";
 
 function EventList() {
   const navigate = useNavigate();
@@ -27,15 +28,16 @@ function EventList() {
   });
 
   useEffect(() => {
-    const savedEvents = localStorage.getItem("events");
-    if (savedEvents) {
-      setEvents(JSON.parse(savedEvents));
-    }
+    loadEvents();
   }, []);
 
-  const saveEvents = (updatedEvents) => {
-    localStorage.setItem("events", JSON.stringify(updatedEvents));
-    setEvents(updatedEvents);
+  const loadEvents = async () => {
+    try {
+      const eventsData = await eventService.getAllEvents();
+      setEvents(eventsData);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
   };
 
   const handleCreateEvent = () => {
@@ -43,37 +45,45 @@ function EventList() {
     setOpenDialog(true);
   };
 
-  const handleSaveEvent = () => {
+  const handleSaveEvent = async () => {
     if (!currentEvent.name) {
       alert("Event name is required");
       return;
     }
 
-    const newEvent = {
-      id: currentEvent.id || Date.now(),
-      name: currentEvent.name,
-      description: currentEvent.description,
-      startDate: currentEvent.startDate,
-      endDate: currentEvent.endDate,
-      status: "DRAFT",
-      createdAt: currentEvent.createdAt || new Date().toISOString(),
-    };
+    try {
+      const eventData = {
+        name: currentEvent.name,
+        description: currentEvent.description || '',
+        start_date: currentEvent.startDate || null,
+        end_date: currentEvent.endDate || null,
+        status: "draft",
+      };
 
-    let updatedEvents;
-    if (currentEvent.id) {
-      updatedEvents = events.map((e) => (e.id === currentEvent.id ? newEvent : e));
-    } else {
-      updatedEvents = [...events, newEvent];
+      if (currentEvent.id) {
+        await eventService.updateEvent(currentEvent.id, eventData);
+      } else {
+        await eventService.createEvent(eventData);
+      }
+
+      await loadEvents();
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error saving event:', error);
+      alert('Failed to save event. Please try again.');
     }
-
-    saveEvents(updatedEvents);
-    setOpenDialog(false);
   };
 
-  const handleDeleteEvent = (eventId) => {
+  const handleDeleteEvent = async (eventId) => {
     if (window.confirm("Are you sure you want to delete this event?")) {
-      const updatedEvents = events.filter((e) => e.id !== eventId);
-      saveEvents(updatedEvents);
+      try {
+        await eventService.deleteEvent(eventId);
+        const updatedEvents = events.filter((e) => e.id !== eventId);
+        setEvents(updatedEvents);
+      } catch (error) {
+        console.error('Error deleting event:', error);
+        alert('Failed to delete event. Please try again.');
+      }
     }
   };
 

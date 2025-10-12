@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { eventService } from "../../services/eventService";
 import {
   Box,
   Button,
@@ -56,18 +57,25 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
     setOpenAssignDialog(true);
   };
 
-  const handleSaveAssignments = () => {
+  const handleSaveAssignments = async () => {
     if (!selectedJudge) return;
 
-    const updatedJudges = judges.map((j) =>
-      j.id === selectedJudge.id
-        ? { ...j, assignedCategories: selectedJudge.assignedCategories, assignedTeams: selectedJudge.assignedTeams }
-        : j
-    );
+    try {
+      await eventService.setJudgeAssignments(selectedJudge.id, selectedJudge.assignedTeams || []);
 
-    onJudgesChange(updatedJudges);
-    setOpenAssignDialog(false);
-    setSelectedJudge(null);
+      const updatedJudges = judges.map((j) =>
+        j.id === selectedJudge.id
+          ? { ...j, assignedCategories: selectedJudge.assignedCategories, assignedTeams: selectedJudge.assignedTeams }
+          : j
+      );
+
+      onJudgesChange(updatedJudges);
+      setOpenAssignDialog(false);
+      setSelectedJudge(null);
+    } catch (error) {
+      console.error('Error saving assignments:', error);
+      alert('Failed to save assignments. Please try again.');
+    }
   };
 
   const handleSendInvitation = async (judge) => {
@@ -104,48 +112,68 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
     }
   };
 
-  const handleSaveJudge = () => {
+  const handleSaveJudge = async () => {
     if (!currentJudge.name || !currentJudge.email || !currentJudge.category) {
       alert("Judge name, email, and category are required");
       return;
     }
 
-    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const newJudge = {
-      id: currentJudge.id || Date.now(),
-      name: currentJudge.name,
-      email: currentJudge.email,
-      category: currentJudge.category,
-      token: currentJudge.token || token,
-      assignedCategories: currentJudge.assignedCategories || [],
-      assignedTeams: currentJudge.assignedTeams || [],
-      invitationSent: currentJudge.invitationSent || false,
-      createdAt: currentJudge.createdAt || new Date().toISOString(),
-    };
+    try {
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const judgeData = {
+        event_id: eventId,
+        name: currentJudge.name,
+        email: currentJudge.email,
+        category: currentJudge.category,
+        token: currentJudge.token || token,
+        invitation_sent: currentJudge.invitation_sent || false,
+      };
 
-    let updatedJudges;
-    if (currentJudge.id) {
-      updatedJudges = judges.map((j) => (j.id === currentJudge.id ? newJudge : j));
-    } else {
-      updatedJudges = [...judges, newJudge];
-    }
+      let savedJudge;
+      if (currentJudge.id) {
+        savedJudge = await eventService.updateJudge(currentJudge.id, judgeData);
+      } else {
+        savedJudge = await eventService.createJudge(judgeData);
+      }
 
-    onJudgesChange(updatedJudges);
-    setOpenDialog(false);
+      if (currentJudge.assignedTeams && currentJudge.assignedTeams.length > 0) {
+        await eventService.setJudgeAssignments(savedJudge.id, currentJudge.assignedTeams);
+      }
 
-    if (!currentJudge.id) {
-      setLinkJudge(newJudge);
-      setOpenLinkDialog(true);
+      const updatedJudgesList = await eventService.getJudgesByEvent(eventId);
+      const judgesWithAssignments = await Promise.all(
+        updatedJudgesList.map(async (j) => {
+          const assignedTeams = await eventService.getJudgeAssignments(j.id);
+          return { ...j, assignedTeams };
+        })
+      );
+
+      onJudgesChange(judgesWithAssignments);
+      setOpenDialog(false);
+
+      if (!currentJudge.id) {
+        setLinkJudge(savedJudge);
+        setOpenLinkDialog(true);
+      }
+    } catch (error) {
+      console.error('Error saving judge:', error);
+      alert('Failed to save judge. Please try again.');
     }
   };
 
-  const handleDeleteJudge = (judgeId) => {
+  const handleDeleteJudge = async (judgeId) => {
     if (window.confirm("Are you sure you want to delete this judge?")) {
-      onJudgesChange(judges.filter((j) => j.id !== judgeId));
+      try {
+        await eventService.deleteJudge(judgeId);
+        onJudgesChange(judges.filter((j) => j.id !== judgeId));
+      } catch (error) {
+        console.error('Error deleting judge:', error);
+        alert('Failed to delete judge. Please try again.');
+      }
     }
   };
 
-  const handleAutoAssignTeams = () => {
+  const handleAutoAssignTeams = async () => {
     const softwareTeams = teams.filter(t => t.categoryId && t.categoryId.toLowerCase() === 'software');
     const hardwareTeams = teams.filter(t => t.categoryId && t.categoryId.toLowerCase() === 'hardware');
 
@@ -200,8 +228,19 @@ function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange
       });
     }
 
-    onJudgesChange(updatedJudges);
-    alert('Teams have been automatically assigned to judges based on their categories!');
+    try {
+      for (const judge of updatedJudges) {
+        if (judge.assignedTeams && judge.assignedTeams.length > 0) {
+          await eventService.setJudgeAssignments(judge.id, judge.assignedTeams);
+        }
+      }
+
+      onJudgesChange(updatedJudges);
+      alert('Teams have been automatically assigned to judges based on their categories!');
+    } catch (error) {
+      console.error('Error auto-assigning teams:', error);
+      alert('Failed to auto-assign teams. Please try again.');
+    }
   };
 
 
