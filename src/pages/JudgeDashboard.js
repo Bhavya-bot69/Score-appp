@@ -32,6 +32,7 @@ function JudgeDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submittedTeams, setSubmittedTeams] = useState(new Set());
+  const [absentTeams, setAbsentTeams] = useState(new Set());
 
   useEffect(() => {
     if (!token) {
@@ -68,6 +69,10 @@ function JudgeDashboard() {
       const assigned = eventTeams.filter(team => assignedTeamIds.includes(team.id));
       console.log('Filtered assigned teams:', assigned);
       setAssignedTeams(assigned);
+
+      // Track absent teams
+      const absent = new Set(assigned.filter(team => team.is_absent).map(team => team.id));
+      setAbsentTeams(absent);
 
       // Load criteria for the event
       const eventCriteria = await eventService.getCriteriaByEvent(foundJudge.event_id);
@@ -151,12 +156,62 @@ function JudgeDashboard() {
   };
 
   const handlePushToAdmin = () => {
-    if (submittedTeams.size !== assignedTeams.length) {
-      alert('Please score all assigned teams before pushing to admin.');
+    const teamsToScore = assignedTeams.filter(team => !absentTeams.has(team.id));
+    if (submittedTeams.size !== teamsToScore.length) {
+      alert('Please score all assigned teams (excluding absent teams) before pushing to admin.');
       return;
     }
 
     alert('All scores are automatically synced to the admin dashboard!');
+  };
+
+  const handleMarkAbsent = async (teamId) => {
+    try {
+      const isCurrentlyAbsent = absentTeams.has(teamId);
+      await eventService.markTeamAbsent(teamId, !isCurrentlyAbsent);
+
+      const newAbsentTeams = new Set(absentTeams);
+      if (isCurrentlyAbsent) {
+        newAbsentTeams.delete(teamId);
+      } else {
+        newAbsentTeams.add(teamId);
+        // Remove from submitted if marking as absent
+        const newSubmittedTeams = new Set(submittedTeams);
+        newSubmittedTeams.delete(teamId);
+        setSubmittedTeams(newSubmittedTeams);
+      }
+      setAbsentTeams(newAbsentTeams);
+
+      alert(isCurrentlyAbsent ? 'Team marked as present.' : 'Team marked as absent.');
+    } catch (error) {
+      console.error('Error marking team absent:', error);
+      alert('Failed to update team status. Please try again.');
+    }
+  };
+
+  const handleRemoveTeam = async (teamId) => {
+    if (!window.confirm('Are you sure you want to remove this team from your assignments?')) {
+      return;
+    }
+
+    try {
+      await eventService.removeJudgeTeamAssignment(judge.id, teamId);
+      setAssignedTeams(assignedTeams.filter(team => team.id !== teamId));
+
+      // Clean up state
+      const newSubmittedTeams = new Set(submittedTeams);
+      newSubmittedTeams.delete(teamId);
+      setSubmittedTeams(newSubmittedTeams);
+
+      const newAbsentTeams = new Set(absentTeams);
+      newAbsentTeams.delete(teamId);
+      setAbsentTeams(newAbsentTeams);
+
+      alert('Team removed from your assignments successfully.');
+    } catch (error) {
+      console.error('Error removing team:', error);
+      alert('Failed to remove team. Please try again.');
+    }
   };
 
   if (loading) {
@@ -236,10 +291,17 @@ function JudgeDashboard() {
               sx={{ fontWeight: 600 }}
             />
             <Chip
-              label={`${submittedTeams.size}/${assignedTeams.length} Scored`}
-              color={submittedTeams.size === assignedTeams.length ? 'success' : 'warning'}
+              label={`${submittedTeams.size}/${assignedTeams.filter(t => !absentTeams.has(t.id)).length} Scored`}
+              color={submittedTeams.size === assignedTeams.filter(t => !absentTeams.has(t.id)).length ? 'success' : 'warning'}
               sx={{ fontWeight: 600 }}
             />
+            {absentTeams.size > 0 && (
+              <Chip
+                label={`${absentTeams.size} Absent`}
+                color="error"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
           </Box>
         </Card>
 
@@ -250,88 +312,179 @@ function JudgeDashboard() {
             {assignedTeams.map((team) => {
               const teamScores = scores[team.id] || {};
               const isSubmitted = submittedTeams.has(team.id);
+              const isAbsent = absentTeams.has(team.id);
 
               return (
-                <Card key={team.id} sx={{ mb: 3, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-                  <Box sx={{ p: 3, background: isSubmitted ? '#ecfdf5' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
+                <Card
+                  key={team.id}
+                  sx={{
+                    mb: 3,
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                    opacity: isAbsent ? 0.6 : 1,
+                    border: isAbsent ? '2px solid #ef4444' : 'none'
+                  }}
+                >
+                  <Box sx={{
+                    p: 3,
+                    background: isAbsent ? '#fee2e2' : (isSubmitted ? '#ecfdf5' : '#f8fafc'),
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
                           {team.name}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748b' }}>
-                          {team.projectTitle || 'No project title'}
+                          {team.project_title || 'No project title'}
                         </Typography>
                       </Box>
-                      {isSubmitted ? (
-                        <Chip
-                          icon={<CheckCircle />}
-                          label="Submitted"
-                          color="success"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      ) : (
-                        <Chip
-                          icon={<HourglassEmpty />}
-                          label="Pending"
-                          color="warning"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      )}
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        {isAbsent ? (
+                          <Chip
+                            label="Absent"
+                            color="error"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        ) : isSubmitted ? (
+                          <Chip
+                            icon={<CheckCircle />}
+                            label="Submitted"
+                            color="success"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        ) : (
+                          <Chip
+                            icon={<HourglassEmpty />}
+                            label="Pending"
+                            color="warning"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Button
+                        variant={isAbsent ? "contained" : "outlined"}
+                        size="small"
+                        onClick={() => handleMarkAbsent(team.id)}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '8px',
+                          ...(isAbsent ? {
+                            background: '#10b981',
+                            '&:hover': { background: '#059669' }
+                          } : {
+                            borderColor: '#ef4444',
+                            color: '#ef4444',
+                            '&:hover': {
+                              borderColor: '#dc2626',
+                              background: '#fef2f2'
+                            }
+                          })
+                        }}
+                      >
+                        {isAbsent ? 'Mark Present' : 'Mark Absent'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveTeam(team.id)}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '8px'
+                        }}
+                      >
+                        Remove Team
+                      </Button>
                     </Box>
                   </Box>
 
-                  <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-                    <Table>
-                      <TableHead>
-                        <TableRow sx={{ background: '#fafafa' }}>
-                          <TableCell sx={{ fontWeight: 700 }}>Criterion</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Score (0-10)</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Weight</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {criteria.map((criterion) => (
-                          <TableRow key={criterion.id}>
-                            <TableCell sx={{ fontWeight: 600 }}>{criterion.name}</TableCell>
-                            <TableCell>
-                              <TextField
-                                type="number"
-                                size="small"
-                                value={teamScores[criterion.id] || ''}
-                                onChange={(e) => handleScoreChange(team.id, criterion.id, e.target.value, criterion.max_score)}
-                                disabled={isSubmitted}
-                                inputProps={{ min: 0, max: criterion.max_score, step: 0.1 }}
-                                sx={{ width: '120px' }}
-                                helperText={`Max: ${criterion.max_score}`}
-                              />
-                            </TableCell>
-                            <TableCell>{criterion.weight}x</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                  {!isAbsent && (
+                    <>
+                      <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+                        <Table>
+                          <TableHead>
+                            <TableRow sx={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+                              <TableCell sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>Criterion</TableCell>
+                              <TableCell sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>Max Score</TableCell>
+                              <TableCell sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>Your Score</TableCell>
+                              <TableCell sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>Weight</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {criteria.map((criterion) => (
+                              <TableRow
+                                key={criterion.id}
+                                sx={{
+                                  '&:hover': {
+                                    backgroundColor: '#f8fafc'
+                                  }
+                                }}
+                              >
+                                <TableCell sx={{ fontWeight: 600, color: '#334155' }}>{criterion.name}</TableCell>
+                                <TableCell sx={{ color: '#64748b', fontWeight: 500 }}>{criterion.max_score}</TableCell>
+                                <TableCell>
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    value={teamScores[criterion.id] || ''}
+                                    onChange={(e) => handleScoreChange(team.id, criterion.id, e.target.value, criterion.max_score)}
+                                    disabled={isSubmitted}
+                                    inputProps={{ min: 0, max: criterion.max_score, step: 0.1 }}
+                                    sx={{
+                                      width: '140px',
+                                      '& .MuiOutlinedInput-root': {
+                                        '&.Mui-focused fieldset': {
+                                          borderColor: '#2563eb'
+                                        }
+                                      }
+                                    }}
+                                    placeholder={`0-${criterion.max_score}`}
+                                  />
+                                </TableCell>
+                                <TableCell sx={{ color: '#64748b', fontWeight: 600 }}>{criterion.weight}x</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
 
-                  <Box sx={{ p: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => handleSubmitScores(team.id)}
-                      disabled={isSubmitted}
-                      sx={{
-                        background: isSubmitted ? '#9ca3af' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                        px: 4,
-                        py: 1.2,
-                        fontWeight: 600,
-                        borderRadius: '10px',
-                        '&:hover': {
-                          background: isSubmitted ? '#9ca3af' : 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                        }
-                      }}
-                    >
-                      {isSubmitted ? 'Scores Submitted' : 'Submit Scores'}
-                    </Button>
-                  </Box>
+                      <Box sx={{ p: 3, display: 'flex', justifyContent: 'flex-end', background: '#fafafa' }}>
+                        <Button
+                          variant="contained"
+                          onClick={() => handleSubmitScores(team.id)}
+                          disabled={isSubmitted}
+                          sx={{
+                            background: isSubmitted
+                              ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
+                              : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                            px: 4,
+                            py: 1.2,
+                            fontWeight: 700,
+                            borderRadius: '10px',
+                            textTransform: 'none',
+                            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              background: isSubmitted
+                                ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
+                                : 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                              transform: isSubmitted ? 'none' : 'translateY(-2px)',
+                              boxShadow: isSubmitted ? '0 2px 8px rgba(37, 99, 235, 0.25)' : '0 4px 12px rgba(37, 99, 235, 0.35)'
+                            }
+                          }}
+                        >
+                          {isSubmitted ? 'Scores Submitted' : 'Submit Scores'}
+                        </Button>
+                      </Box>
+                    </>
+                  )}
                 </Card>
               );
             })}

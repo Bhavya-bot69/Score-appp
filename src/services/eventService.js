@@ -304,5 +304,27 @@ export const eventService = {
       ...team,
       isAssigned: assignedTeamIds.includes(team.id)
     }));
+  },
+
+  async markTeamAbsent(teamId, isAbsent) {
+    const { data, error } = await supabase
+      .from('teams')
+      .update({ is_absent: isAbsent })
+      .eq('id', teamId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async removeJudgeTeamAssignment(judgeId, teamId) {
+    const { error } = await supabase
+      .from('judge_team_assignments')
+      .delete()
+      .eq('judge_id', judgeId)
+      .eq('team_id', teamId);
+
+    if (error) throw error;
   }
 };
