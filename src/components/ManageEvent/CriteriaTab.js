@@ -15,6 +15,7 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  Typography,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -22,53 +23,66 @@ import {
   Delete as DeleteIcon,
 } from "@mui/icons-material";
 
-function CategoriesTab({ categories, onCategoriesChange }) {
+function CriteriaTab({ categories, onCategoriesChange }) {
   const [openDialog, setOpenDialog] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState({
+  const [currentCriterion, setCurrentCriterion] = useState({
     name: "",
     maxMarks: 100,
   });
 
-  const handleAddCategory = () => {
-    setCurrentCategory({ name: "", maxMarks: 100 });
+  const handleAddCriterion = () => {
+    setCurrentCriterion({ name: "", maxMarks: 100 });
     setOpenDialog(true);
   };
 
-  const handleSaveCategory = () => {
-    if (!currentCategory.name) {
-      alert("Category name is required");
+  const handleSaveCriterion = () => {
+    if (!currentCriterion.name) {
+      alert("Criterion name is required");
       return;
     }
 
-    const newCategory = {
-      id: currentCategory.id || Date.now(),
-      name: currentCategory.name,
-      maxMarks: currentCategory.maxMarks || 100,
-      createdAt: currentCategory.createdAt || new Date().toISOString(),
-    };
-
-    let updatedCategories;
-    if (currentCategory.id) {
-      updatedCategories = categories.map((c) => (c.id === currentCategory.id ? newCategory : c));
-    } else {
-      updatedCategories = [...categories, newCategory];
+    if (!currentCriterion.maxMarks || currentCriterion.maxMarks <= 0) {
+      alert("Max marks must be greater than 0");
+      return;
     }
 
-    onCategoriesChange(updatedCategories);
+    const newCriterion = {
+      id: currentCriterion.id || Date.now(),
+      name: currentCriterion.name,
+      maxMarks: currentCriterion.maxMarks || 100,
+      createdAt: currentCriterion.createdAt || new Date().toISOString(),
+    };
+
+    let updatedCriteria;
+    if (currentCriterion.id) {
+      updatedCriteria = categories.map((c) => (c.id === currentCriterion.id ? newCriterion : c));
+    } else {
+      updatedCriteria = [...categories, newCriterion];
+    }
+
+    onCategoriesChange(updatedCriteria);
     setOpenDialog(false);
   };
 
-  const handleDeleteCategory = (categoryId) => {
-    if (window.confirm("Are you sure you want to delete this category?")) {
-      onCategoriesChange(categories.filter((c) => c.id !== categoryId));
+  const handleDeleteCriterion = (criterionId) => {
+    if (window.confirm("Are you sure you want to delete this criterion?")) {
+      onCategoriesChange(categories.filter((c) => c.id !== criterionId));
     }
   };
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddCategory}>
-          Add Category
+      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#1e293b", mb: 0.5 }}>
+            Scoring Criteria
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#64748b" }}>
+            Define the criteria judges will use to evaluate teams
+          </Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddCriterion}>
+          Add Criterion
         </Button>
       </Box>
 
@@ -87,7 +101,7 @@ function CategoriesTab({ categories, onCategoriesChange }) {
                 background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)"
               }}
             >
-              <TableCell sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.95rem" }}>Category Name</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.95rem" }}>Criterion Name</TableCell>
               <TableCell sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.95rem" }}>Max Marks</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.95rem" }}>Actions</TableCell>
             </TableRow>
@@ -95,27 +109,32 @@ function CategoriesTab({ categories, onCategoriesChange }) {
           <TableBody>
             {categories.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} align="center">
-                  No categories added yet. Click "Add Category" to get started.
+                <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" sx={{ color: "#64748b", mb: 1 }}>
+                    No scoring criteria added yet.
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                    Click "Add Criterion" to define evaluation criteria (e.g., PPT: 50 marks, Prototype: 50 marks)
+                  </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              categories.map((category) => (
+              categories.map((criterion) => (
                 <TableRow
-                  key={category.id}
+                  key={criterion.id}
                   sx={{
                     "&:hover": {
                       backgroundColor: "#f8fafc"
                     }
                   }}
                 >
-                  <TableCell sx={{ color: "#334155", fontWeight: 500 }}>{category.name}</TableCell>
-                  <TableCell sx={{ color: "#334155", fontWeight: 600 }}>{category.maxMarks}</TableCell>
+                  <TableCell sx={{ color: "#334155", fontWeight: 500 }}>{criterion.name}</TableCell>
+                  <TableCell sx={{ color: "#334155", fontWeight: 600 }}>{criterion.maxMarks}</TableCell>
                   <TableCell align="right">
                     <IconButton
                       size="small"
                       onClick={() => {
-                        setCurrentCategory(category);
+                        setCurrentCriterion(criterion);
                         setOpenDialog(true);
                       }}
                       sx={{
@@ -129,7 +148,7 @@ function CategoriesTab({ categories, onCategoriesChange }) {
                     </IconButton>
                     <IconButton
                       size="small"
-                      onClick={() => handleDeleteCategory(category.id)}
+                      onClick={() => handleDeleteCriterion(criterion.id)}
                       sx={{
                         color: "#ef4444",
                         "&:hover": {
@@ -148,27 +167,32 @@ function CategoriesTab({ categories, onCategoriesChange }) {
       </TableContainer>
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{currentCategory.id ? "Edit Category" : "Add New Category"}</DialogTitle>
+        <DialogTitle>{currentCriterion.id ? "Edit Criterion" : "Add New Criterion"}</DialogTitle>
         <DialogContent>
+          <Typography variant="body2" sx={{ color: "#64748b", mb: 2, mt: 1 }}>
+            Define a scoring criterion that judges will use to evaluate teams. For example: "PPT" with 50 marks, "Prototype" with 50 marks.
+          </Typography>
           <TextField
             fullWidth
-            label="Category Name"
-            value={currentCategory.name}
-            onChange={(e) => setCurrentCategory({ ...currentCategory, name: e.target.value })}
+            label="Criterion Name"
+            value={currentCriterion.name}
+            onChange={(e) => setCurrentCriterion({ ...currentCriterion, name: e.target.value })}
             margin="normal"
             required
-            placeholder="e.g., Software, Hardware, Innovation"
+            placeholder="e.g., PPT, Prototype, Innovation"
           />
           <TextField
             fullWidth
             label="Max Marks"
             type="number"
-            value={currentCategory.maxMarks}
+            value={currentCriterion.maxMarks}
             onChange={(e) =>
-              setCurrentCategory({ ...currentCategory, maxMarks: parseInt(e.target.value) || 0 })
+              setCurrentCriterion({ ...currentCriterion, maxMarks: parseInt(e.target.value) || 0 })
             }
             margin="normal"
             required
+            inputProps={{ min: 1 }}
+            helperText="Enter the maximum marks for this criterion"
           />
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
@@ -190,7 +214,7 @@ function CategoriesTab({ categories, onCategoriesChange }) {
             Cancel
           </Button>
           <Button
-            onClick={handleSaveCategory}
+            onClick={handleSaveCriterion}
             variant="contained"
             sx={{
               background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
@@ -208,7 +232,7 @@ function CategoriesTab({ categories, onCategoriesChange }) {
               }
             }}
           >
-            {currentCategory.id ? "Update" : "Create"}
+            {currentCriterion.id ? "Update" : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -216,4 +240,4 @@ function CategoriesTab({ categories, onCategoriesChange }) {
   );
 }
 
-export default CategoriesTab;
+export default CriteriaTab;

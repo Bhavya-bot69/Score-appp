@@ -25,7 +25,7 @@ import TeamsTab from "../components/ManageEvent/TeamsTab";
 import JudgesTab from "../components/ManageEvent/JudgesTab";
 import RoundsTab from "../components/ManageEvent/RoundsTab";
 import VenuesTab from "../components/ManageEvent/VenuesTab";
-import CategoriesTab from "../components/ManageEvent/CategoriesTab";
+import CriteriaTab from "../components/ManageEvent/CriteriaTab";
 
 function ManageEvent() {
   const { eventId } = useParams();
@@ -36,7 +36,7 @@ function ManageEvent() {
   const [judges, setJudges] = useState([]);
   const [rounds, setRounds] = useState([]);
   const [venues, setVenues] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [criteria, setCriteria] = useState([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ function ManageEvent() {
     setJudges(JSON.parse(localStorage.getItem(`judges_${eventId}`) || "[]"));
     setRounds(JSON.parse(localStorage.getItem(`rounds_${eventId}`) || "[]"));
     setVenues(JSON.parse(localStorage.getItem(`venues_${eventId}`) || "[]"));
-    setCategories(JSON.parse(localStorage.getItem(`categories_${eventId}`) || "[]"));
+    setCriteria(JSON.parse(localStorage.getItem(`criteria_${eventId}`) || "[]"));
   }, [eventId]);
 
   const saveData = (key, data) => {
@@ -85,9 +85,9 @@ function ManageEvent() {
     saveData("venues", updatedVenues);
   };
 
-  const handleCategoriesChange = (updatedCategories) => {
-    setCategories(updatedCategories);
-    saveData("categories", updatedCategories);
+  const handleCriteriaChange = (updatedCriteria) => {
+    setCriteria(updatedCriteria);
+    saveData("criteria", updatedCriteria);
   };
 
   if (!event) {
@@ -127,10 +127,10 @@ function ManageEvent() {
       icon: <PlaceOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
       count: venues.length 
     },
-    { 
-      label: "Categories", 
+    {
+      label: "Criteria",
       icon: <CategoryOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
-      count: categories.length 
+      count: criteria.length
     },
   ];
   
@@ -475,12 +475,12 @@ function ManageEvent() {
 
           {[1, 2, 3, 4, 5].includes(currentTab) && (
             <TabContent isActive={[1, 2, 3, 4, 5].includes(currentTab)}>
-              {currentTab === 1 && <TeamsTab teams={teams} venues={venues} categories={categories} onTeamsChange={handleTeamsChange} />}
+              {currentTab === 1 && <TeamsTab teams={teams} venues={venues} categories={criteria} onTeamsChange={handleTeamsChange} />}
               {currentTab === 2 && (
                 <JudgesTab
                   judges={judges}
                   venues={venues}
-                  categories={categories}
+                  categories={criteria}
                   teams={teams}
                   onJudgesChange={handleJudgesChange}
                   eventId={eventId}
@@ -489,7 +489,7 @@ function ManageEvent() {
               )}
               {currentTab === 3 && <RoundsTab rounds={rounds} onRoundsChange={handleRoundsChange} />}
               {currentTab === 4 && <VenuesTab venues={venues} onVenuesChange={handleVenuesChange} />}
-              {currentTab === 5 && <CategoriesTab categories={categories} onCategoriesChange={handleCategoriesChange} />}
+              {currentTab === 5 && <CriteriaTab categories={criteria} onCategoriesChange={handleCriteriaChange} />}
             </TabContent>
           )}
         </Box>
