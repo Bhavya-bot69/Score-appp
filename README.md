@@ -1,70 +1,96 @@
-# Getting Started with Create React App
+# 🎯 EvelutorApp — Fair & Transparent Judging Platform
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> A modern web platform for managing multi-round evaluation events like hackathons, idea pitches, and innovation challenges — with built-in bias correction and real-time results.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🌟 Overview
 
-### `npm start`
+**EvelutorApp** streamlines event evaluation from setup to final results.  
+Admins can create events, assign judges, manage rounds, and automatically normalize scores to ensure fairness — eliminating judge bias using **Z-score normalization**.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+This project aims to make competition scoring **transparent**, **data-driven**, and **simple**.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+---
 
-### `npm test`
+## 🧩 Core Features
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 👩‍💼 Admin Portal
+- Create and configure events, rounds, venues, and categories  
+- Define weighted scoring categories (e.g., *Innovation*, *Technical*, *Presentation*)  
+- Manage teams, judges, and assignments  
+- Trigger computations: **Top-N selection**, **Normalization**, **Final Rankings**  
+- Export results (CSV/PDF)  
+- View and override scores with full audit trail  
 
-### `npm run build`
+### 🧑‍⚖️ Judge Interface
+- Simple, distraction-free scoring form  
+- Enter category scores via secure tokenized links (no login hassle)  
+- Auto-calculated totals and validation  
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 📊 Results & Fairness Engine
+- Judge-wise **Z-score normalization** to remove leniency/harshness bias  
+- Percentile-based ranking for final results  
+- Multi-round progression (Round 1 → Round 2 finalists)  
+- Supports manual edits, audit logging, and data exports  
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 🧠 How It Works
 
-### `npm run eject`
+### 🧮 Scoring Pipeline
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1. **Raw Totals** → judges rate teams across categories  
+2. **Z-score Normalization** → adjusts for judge bias  
+3. **Aggregation** → team mean Z computed across judges  
+4. **Percentile Mapping** → converts to fair, intuitive scores  
+5. **Ranking** → final team order is derived
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+This ensures results reflect *relative performance*, not judge variability.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+---
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 🗃️ Tech Stack
 
-## Learn More
+| Layer | Technology |
+|-------|-------------|
+| **Frontend** | React + Tailwind CSS |
+| **Backend** | Node.js / Express *(or Django/Flask alternative)* |
+| **Database** | PostgreSQL |
+| **Auth** | JWT for Admin, Secure Token Links for Judges |
+| **Hosting** | Vercel / AWS / DigitalOcean |
+| **Optional** | WebSockets (Live dashboards) |
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## ⚙️ API Structure (Simplified)
 
-### Code Splitting
+| Endpoint | Method | Description |
+|-----------|---------|-------------|
+| `/api/events` | POST | Create new event |
+| `/api/events/:id/categories` | POST | Add category |
+| `/api/events/:id/judges` | POST | Add judge |
+| `/api/rounds/:id/evaluations` | POST | Submit scores |
+| `/api/rounds/:id/normalize` | POST | Run normalization |
+| `/api/rounds/:id/results` | GET | View final results |
+| `/api/events/:id/export` | GET | Export CSV/PDF |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+---
 
-### Analyzing the Bundle Size
+## 💻 Frontend Modules
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- **AdminDashboard** — manage events, judges, and rounds  
+- **CategoryManager** — create/edit weighted categories  
+- **AssignmentPage** — assign judges to teams/venues  
+- **JudgeInterface** — intuitive scoring page (mobile-friendly)  
+- **LiveResultsPage** — view normalized rankings  
+- **RoundManagementPage** — compute results and advance rounds  
 
-### Making a Progressive Web App
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 📐 Normalization Algorithm (Simplified JS)
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```js
+z = (score - meanJudgeScore) / stdDeviationJudge
+teamZ = average(zScoresFromAllJudges)
+percentile = rank(teamZ) / (totalTeams - 1)
