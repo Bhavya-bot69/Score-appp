@@ -505,7 +505,7 @@ function ManageEvent() {
               )}
               {currentTab === 3 && <RoundsTab rounds={rounds} onRoundsChange={handleRoundsChange} />}
               {currentTab === 4 && <VenuesTab venues={venues} onVenuesChange={handleVenuesChange} />}
-              {currentTab === 5 && <CriteriaTab categories={criteria} onCategoriesChange={handleCriteriaChange} />}
+              {currentTab === 5 && <CriteriaTab categories={criteria} onCategoriesChange={handleCriteriaChange} eventId={eventId} />}
             </TabContent>
           )}
         </Box>

@@ -22,8 +22,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
+import { eventService } from "../../services/eventService";
 
-function CriteriaTab({ categories, onCategoriesChange }) {
+function CriteriaTab({ categories, onCategoriesChange, eventId }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentCriterion, setCurrentCriterion] = useState({
     name: "",
@@ -35,7 +36,7 @@ function CriteriaTab({ categories, onCategoriesChange }) {
     setOpenDialog(true);
   };
 
-  const handleSaveCriterion = () => {
+  const handleSaveCriterion = async () => {
     if (!currentCriterion.name) {
       alert("Criterion name is required");
       return;
@@ -46,27 +47,55 @@ function CriteriaTab({ categories, onCategoriesChange }) {
       return;
     }
 
-    const newCriterion = {
-      id: currentCriterion.id || Date.now(),
-      name: currentCriterion.name,
-      maxMarks: currentCriterion.maxMarks || 100,
-      createdAt: currentCriterion.createdAt || new Date().toISOString(),
-    };
+    try {
+      const criterionData = {
+        event_id: eventId,
+        name: currentCriterion.name,
+        max_score: currentCriterion.maxMarks || 100,
+      };
 
-    let updatedCriteria;
-    if (currentCriterion.id) {
-      updatedCriteria = categories.map((c) => (c.id === currentCriterion.id ? newCriterion : c));
-    } else {
-      updatedCriteria = [...categories, newCriterion];
+      if (currentCriterion.id) {
+        // Update existing criterion
+        await eventService.updateCriterion(currentCriterion.id, criterionData);
+      } else {
+        // Create new criterion
+        await eventService.createCriterion(criterionData);
+      }
+
+      // Reload criteria from database
+      const updatedCriteria = await eventService.getCriteriaByEvent(eventId);
+      const mappedCriteria = updatedCriteria.map(c => ({
+        id: c.id,
+        name: c.name,
+        maxMarks: c.max_score,
+        createdAt: c.created_at
+      }));
+      onCategoriesChange(mappedCriteria);
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error saving criterion:', error);
+      alert('Failed to save criterion. Please try again.');
     }
-
-    onCategoriesChange(updatedCriteria);
-    setOpenDialog(false);
   };
 
-  const handleDeleteCriterion = (criterionId) => {
+  const handleDeleteCriterion = async (criterionId) => {
     if (window.confirm("Are you sure you want to delete this criterion?")) {
-      onCategoriesChange(categories.filter((c) => c.id !== criterionId));
+      try {
+        await eventService.deleteCriterion(criterionId);
+
+        // Reload criteria from database
+        const updatedCriteria = await eventService.getCriteriaByEvent(eventId);
+        const mappedCriteria = updatedCriteria.map(c => ({
+          id: c.id,
+          name: c.name,
+          maxMarks: c.max_score,
+          createdAt: c.created_at
+        }));
+        onCategoriesChange(mappedCriteria);
+      } catch (error) {
+        console.error('Error deleting criterion:', error);
+        alert('Failed to delete criterion. Please try again.');
+      }
     }
   };
 

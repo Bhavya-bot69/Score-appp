@@ -26,6 +26,7 @@ function JudgeDashboard() {
 
   const [judge, setJudge] = useState(null);
   const [assignedTeams, setAssignedTeams] = useState([]);
+  const [criteria, setCriteria] = useState([]);
   const [currentRound] = useState(1);
   const [scores, setScores] = useState({});
   const [loading, setLoading] = useState(true);
@@ -68,6 +69,11 @@ function JudgeDashboard() {
       console.log('Filtered assigned teams:', assigned);
       setAssignedTeams(assigned);
 
+      // Load criteria for the event
+      const eventCriteria = await eventService.getCriteriaByEvent(foundJudge.event_id);
+      console.log('Event criteria:', eventCriteria);
+      setCriteria(eventCriteria);
+
       const existingScores = await eventService.getScoresByJudge(foundJudge.id);
       console.log('Existing scores:', existingScores);
 
@@ -81,10 +87,10 @@ function JudgeDashboard() {
         scoresMap[score.team_id][score.criterion_key] = score.score;
       });
 
+      // Check if all criteria are filled for each team
       assigned.forEach(team => {
         const teamScores = scoresMap[team.id] || {};
-        const criteria = ['innovation', 'execution', 'presentation', 'impact'];
-        const allFilled = criteria.every(c => teamScores[c] !== undefined && teamScores[c] !== '');
+        const allFilled = eventCriteria.every(c => teamScores[c.id] !== undefined && teamScores[c.id] !== '');
         if (allFilled) {
           submitted.add(team.id);
         }
@@ -100,23 +106,22 @@ function JudgeDashboard() {
     }
   };
 
-  const handleScoreChange = (teamId, criterion, value) => {
+  const handleScoreChange = (teamId, criterionId, value, maxScore) => {
     const numValue = parseFloat(value);
-    if (isNaN(numValue) || numValue < 0 || numValue > 10) return;
+    if (isNaN(numValue) || numValue < 0 || numValue > maxScore) return;
 
     setScores(prev => ({
       ...prev,
       [teamId]: {
         ...prev[teamId],
-        [criterion]: numValue
+        [criterionId]: numValue
       }
     }));
   };
 
   const handleSubmitScores = async (teamId) => {
     const teamScores = scores[teamId] || {};
-    const criteria = ['innovation', 'execution', 'presentation', 'impact'];
-    const allFilled = criteria.every(c => teamScores[c] !== undefined && teamScores[c] !== '');
+    const allFilled = criteria.every(c => teamScores[c.id] !== undefined && teamScores[c.id] !== '');
 
     if (!allFilled) {
       alert('Please fill in all criteria scores before submitting.');
@@ -124,12 +129,12 @@ function JudgeDashboard() {
     }
 
     try {
-      for (const criterionKey of criteria) {
+      for (const criterion of criteria) {
         await eventService.upsertScore({
           judge_id: judge.id,
           team_id: teamId,
-          criterion_key: criterionKey,
-          score: teamScores[criterionKey],
+          criterion_key: criterion.id,
+          score: teamScores[criterion.id],
           round: currentRound
         });
       }
@@ -201,12 +206,7 @@ function JudgeDashboard() {
     );
   }
 
-  const criteria = [
-    { key: 'innovation', label: 'Innovation', weight: 1 },
-    { key: 'execution', label: 'Execution', weight: 1 },
-    { key: 'presentation', label: 'Presentation', weight: 1 },
-    { key: 'impact', label: 'Impact', weight: 1 },
-  ];
+  // Criteria are now loaded from database in loadJudgeData()
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#f5f7fa', p: 4 }}>
@@ -292,17 +292,18 @@ function JudgeDashboard() {
                       </TableHead>
                       <TableBody>
                         {criteria.map((criterion) => (
-                          <TableRow key={criterion.key}>
-                            <TableCell sx={{ fontWeight: 600 }}>{criterion.label}</TableCell>
+                          <TableRow key={criterion.id}>
+                            <TableCell sx={{ fontWeight: 600 }}>{criterion.name}</TableCell>
                             <TableCell>
                               <TextField
                                 type="number"
                                 size="small"
-                                value={teamScores[criterion.key] || ''}
-                                onChange={(e) => handleScoreChange(team.id, criterion.key, e.target.value)}
+                                value={teamScores[criterion.id] || ''}
+                                onChange={(e) => handleScoreChange(team.id, criterion.id, e.target.value, criterion.max_score)}
                                 disabled={isSubmitted}
-                                inputProps={{ min: 0, max: 10, step: 0.1 }}
+                                inputProps={{ min: 0, max: criterion.max_score, step: 0.1 }}
                                 sx={{ width: '120px' }}
+                                helperText={`Max: ${criterion.max_score}`}
                               />
                             </TableCell>
                             <TableCell>{criterion.weight}x</TableCell>
