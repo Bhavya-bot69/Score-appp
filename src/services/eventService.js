@@ -210,10 +210,15 @@ export const eventService = {
   },
 
   async setJudgeAssignments(judgeId, teamIds) {
-    await supabase
+    const { error: deleteError } = await supabase
       .from('judge_team_assignments')
       .delete()
       .eq('judge_id', judgeId);
+
+    if (deleteError) {
+      console.error('Error deleting assignments:', deleteError);
+      throw deleteError;
+    }
 
     if (teamIds && teamIds.length > 0) {
       const assignments = teamIds.map(teamId => ({
@@ -221,11 +226,14 @@ export const eventService = {
         team_id: teamId
       }));
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('judge_team_assignments')
         .insert(assignments);
 
-      if (error) throw error;
+      if (insertError) {
+        console.error('Error inserting assignments:', insertError);
+        throw insertError;
+      }
     }
   },
 
