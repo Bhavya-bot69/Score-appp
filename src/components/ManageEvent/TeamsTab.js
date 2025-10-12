@@ -257,7 +257,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
                   return result;
               };
 
-              const newTeams = json.map((row, index) => {
+              const validTeams = json.map((row, index) => {
                   const teamData = extractRowData(row);
 
                   if (!teamData.name || !teamData.leaderName || !teamData.leaderEmail) {
@@ -265,21 +265,38 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
                       return null;
                   }
 
-                  return {
-                      id: Date.now() + Math.random(),
-                      name: teamData.name,
-                      projectTitle: teamData.projectTitle,
-                      leaderName: teamData.leaderName,
-                      leaderEmail: teamData.leaderEmail,
-                      categoryId: teamData.categoryId,
-                      createdAt: new Date().toISOString(),
-                  };
+                  return teamData;
               }).filter(Boolean);
 
-              if (newTeams.length > 0) {
-                const updatedTeams = [...teams, ...newTeams];
-                onTeamsChange(updatedTeams);
-                alert(`Successfully imported ${newTeams.length} team(s)`);
+              if (validTeams.length > 0) {
+                const importTeams = async () => {
+                  try {
+                    const createdTeams = [];
+                    for (const teamData of validTeams) {
+                      const newTeam = await eventService.createTeam({
+                        event_id: eventId,
+                        name: teamData.name,
+                        category_id: teamData.categoryId || '',
+                        project_title: teamData.projectTitle || '',
+                        project_description: '',
+                        members: [{
+                          name: teamData.leaderName,
+                          email: teamData.leaderEmail,
+                          role: 'leader'
+                        }]
+                      });
+                      createdTeams.push(newTeam);
+                    }
+
+                    const updatedTeams = await eventService.getTeamsByEvent(eventId);
+                    onTeamsChange(updatedTeams);
+                    alert(`Successfully imported ${createdTeams.length} team(s)`);
+                  } catch (error) {
+                    console.error('Error importing teams:', error);
+                    alert('Failed to import some teams. Please try again.');
+                  }
+                };
+                importTeams();
               } else {
                 alert('No valid teams found in the file. Please ensure required columns exist: Team Name, Leader Name, and Leader Email');
               }
