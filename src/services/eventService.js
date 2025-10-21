@@ -259,14 +259,17 @@ export const eventService = {
   },
 
   async getScoresByEvent(eventId) {
+    const teams = await this.getTeamsByEvent(eventId);
+    const teamIds = teams.map(t => t.id);
+
+    if (teamIds.length === 0) {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('scores')
-      .select(`
-        *,
-        judge:judges(*),
-        team:teams(*)
-      `)
-      .eq('team.event_id', eventId);
+      .select('*')
+      .in('team_id', teamIds);
 
     if (error) throw error;
     return data || [];

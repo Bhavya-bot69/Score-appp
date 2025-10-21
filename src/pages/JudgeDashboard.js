@@ -494,9 +494,9 @@ function JudgeDashboard() {
                 variant="contained"
                 size="large"
                 onClick={handlePushToAdmin}
-                disabled={submittedTeams.size !== assignedTeams.length}
+                disabled={submittedTeams.size !== assignedTeams.filter(t => !absentTeams.has(t.id)).length}
                 sx={{
-                  background: submittedTeams.size === assignedTeams.length
+                  background: submittedTeams.size === assignedTeams.filter(t => !absentTeams.has(t.id)).length
                     ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                     : '#9ca3af',
                   px: 6,
@@ -506,7 +506,7 @@ function JudgeDashboard() {
                   borderRadius: '12px',
                   boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
                   '&:hover': {
-                    background: submittedTeams.size === assignedTeams.length
+                    background: submittedTeams.size === assignedTeams.filter(t => !absentTeams.has(t.id)).length
                       ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
                       : '#9ca3af',
                   }

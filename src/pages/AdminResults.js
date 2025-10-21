@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import Navigation from '../components/Navigation';
 import { processCompleteJudging } from '../utils/scoringCalculations';
+import { eventService } from '../services/eventService';
 
 function AdminResults() {
   const { eventId } = useParams();
@@ -37,21 +38,43 @@ function AdminResults() {
   const [judges, setJudges] = useState([]);
 
   useEffect(() => {
-    loadScoresFromJudges();
-    setTeams(JSON.parse(localStorage.getItem(`teams_${eventId}`) || '[]'));
-    setJudges(JSON.parse(localStorage.getItem(`judges_${eventId}`) || '[]'));
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  const loadScoresFromJudges = () => {
-    const allScores = [];
-    judges.forEach(judge => {
-      const scoreData = localStorage.getItem(`admin_scores_${judge.id}`);
-      if (scoreData) {
-        allScores.push(JSON.parse(scoreData));
-      }
-    });
-    setJudgeScores(allScores);
+  const loadData = async () => {
+    try {
+      const eventTeams = await eventService.getTeamsByEvent(eventId);
+      setTeams(eventTeams);
+
+      const eventJudges = await eventService.getJudgesByEvent(eventId);
+      setJudges(eventJudges);
+
+      const allScores = await eventService.getScoresByEvent(eventId);
+
+      const judgeScoresMap = {};
+      allScores.forEach(score => {
+        if (!judgeScoresMap[score.judge_id]) {
+          const judge = eventJudges.find(j => j.id === score.judge_id);
+          judgeScoresMap[score.judge_id] = {
+            judgeId: score.judge_id,
+            judgeName: judge?.name || 'Unknown Judge',
+            round: score.round,
+            scores: {}
+          };
+        }
+
+        if (!judgeScoresMap[score.judge_id].scores[score.team_id]) {
+          judgeScoresMap[score.judge_id].scores[score.team_id] = {};
+        }
+
+        judgeScoresMap[score.judge_id].scores[score.team_id][score.criterion_key] = score.score;
+      });
+
+      setJudgeScores(Object.values(judgeScoresMap));
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const handleCalculateResults = () => {
